@@ -1,4 +1,6 @@
 from bs4 import BeautifulSoup
+from telegram import Bot
+import asyncio
 import requests
 from datetime import timedelta
 import random
@@ -7,12 +9,13 @@ import re
 import os
 
 class Rent591Watcher:
-    def __init__(self, url:str, token:str, wanted_page:int=2):
+    def __init__(self, url:str, tg_channel:int, tg_token:str, wanted_page:int=2):
         self.headers={
             'user-agent' : 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/84.0.4147.125 Safari/537.36'
             }
         self.search_url = f"{url.replace('sort=posttime_desc', '')}&sort=posttime_desc"
-        self.__linetoken=token
+        self.__tg_channel = tg_channel
+        self.__tg_token = tg_token
         self.wanted_page = wanted_page
     
     def get_house_id(self):
@@ -94,14 +97,9 @@ class Rent591Watcher:
         else:
             return timedelta(0)
 
-    def send_message(self, msg):
-        headers = {
-            "Authorization": f"Bearer {self.__linetoken}",
-            "Content-Type" : "application/x-www-form-urlencoded"
-            }
-        payload = {'message': msg}
-        r = requests.post("https://notify-api.line.me/api/notify", headers = headers, params = payload)
-        return r.status_code
+    async def send_tg_message(self, text:str):
+        bot = Bot(token=self.__tg_token)
+        await bot.send_message(chat_id=self.__tg_channel, text=text)
     
     def send_new_houses(self):
         house_ids = self.get_house_id()
@@ -113,11 +111,12 @@ class Rent591Watcher:
             post_time = self.transform_post_time(post_time)
             if post_time <= timedelta(hours=8): # send if within 8 hours
                 msg = self.generate_message(id, house_detail)
-                self.send_message(msg)
+                asyncio.run(self.send_tg_message(msg))
 
 # send news with keywords
 url = os.environ['URL'] # 591 url
-linetoken = os.environ['LINE_NOTIFY_TOKEN'] # line token
+tg_channel = int(os.environ['TG_CHANNEL']) # telegram channel
+tg_token = os.environ['TG_TOKEN'] # telegram token
 wanted_page = 2
-bot = Rent591Watcher(url, linetoken, wanted_page)
+bot = Rent591Watcher(url, tg_channel, tg_token, wanted_page)
 bot.send_new_houses()

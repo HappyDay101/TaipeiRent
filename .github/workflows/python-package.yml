@@ -26,6 +26,7 @@ jobs:
       
       - name: Run Python Code
         env:
-          LINE_NOTIFY_TOKEN: ${{ secrets.LINE_NOTIFY_TOKEN }}
           URL: ${{ secrets.URL }}
+          TG_CHANNEL: ${{ secrets.TG_CHANNEL }}
+          TG_TOKEN: ${{ secrets.TG_TOKEN }}
         run: python main.py
