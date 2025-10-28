@@ -120,7 +120,7 @@ class Rent591Watcher:
             
             # Use the safely retrieved/decoded dictionary for 'publish'
             # post_time will be None if 'postTime' is missing from the dictionary
-            post_time_value = publish_data.get('postTime')]
+            post_time_value = publish_data.get('postTime')
             # check time
             if post_time_value is None:
                 # Handle case where 'postTime' is still missing
