@@ -132,6 +132,7 @@ class Rent591Watcher:
             if post_time <= timedelta(hours=8): # send if within 8 hours
                 msg = self.generate_message(id, house_detail)
                 asyncio.run(self.send_tg_message(msg))
+            time.sleep(0.1)
 
 # send news with keywords
 url = os.environ['URL'] # 591 url
