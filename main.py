@@ -106,28 +106,33 @@ class Rent591Watcher:
         for id in house_ids:
             house_detail = self.get_house_detail(id)
             
-            # check time
-            publish_data = house_detail.get('publish')
-        
-            # Check if 'publish' is a string and needs decoding
-            if isinstance(publish_data, str):
+            publish_data_raw = house_detail.get('publish')
+
+            # 2. Initialize publish_data to hold the dictionary
+            publish_data = {} 
+            
+            # Check if the retrieved data is a string (a JSON string)
+            if isinstance(publish_data_raw, str):
                 try:
-                    # Attempt to parse the string into a dictionary
-                    publish_data = json.loads(publish_data)
+                    # Attempt to parse the JSON string into a dictionary
+                    publish_data = json.loads(publish_data_raw)
                 except json.JSONDecodeError:
                     print(f"Error: Failed to decode 'publish' JSON string for house ID {id}. Skipping house.")
                     continue # Skip this house if decoding fails
+            # Check if it's already a dictionary (or None, which is handled below)
+            elif isinstance(publish_data_raw, dict):
+                publish_data = publish_data_raw
             
             # Use the safely retrieved/decoded dictionary for 'publish'
-            # post_time will be None if 'postTime' is missing from the dictionary
+            # post_time_value will be None if 'postTime' is missing from the dictionary
             post_time_value = publish_data.get('postTime')
-            # check time
+            
+            # Check if 'postTime' is available for the time check
             if post_time_value is None:
-                # Handle case where 'postTime' is still missing
-                print(f"Warning: 'postTime' missing for house ID {id}. Skipping time check.")
+                print(f"Warning: 'postTime' missing for house ID {id} or 'publish' data was invalid. Skipping time check.")
                 continue
                 
-            # post_time = house_detail.get('publish').get('postTime')
+            # The rest of your logic
             post_time = self.transform_post_time(post_time_value)
             if post_time <= timedelta(hours=8): # send if within 8 hours
                 msg = self.generate_message(id, house_detail)
