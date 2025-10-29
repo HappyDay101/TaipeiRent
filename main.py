@@ -106,11 +106,16 @@ class Rent591Watcher:
         for id in house_ids:
             house_detail = self.get_house_detail(id)
             
-            publish_data_raw = house_detail.get('publish')
 
-            # 2. Initialize publish_data to hold the dictionary
-            publish_data = {} 
+           if isinstance(house_detail, str):
+               try:
+                   # Attempt to convert the string to a dictionary
+                   house_detail = json.loads(house_detail)
+               except json.JSONDecodeError:
+                   print(f"Error: Failed to decode full house details JSON string for house ID {id}. Skipping house.")
+                   continue # Skip this house if decoding fails
             
+            publish_data_raw = house_detail.get('publish')
             # Check if the retrieved data is a string (a JSON string)
             if isinstance(publish_data_raw, str):
                 try:
