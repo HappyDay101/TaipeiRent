@@ -107,13 +107,13 @@ class Rent591Watcher:
             house_detail = self.get_house_detail(id)
             
 
-           if isinstance(house_detail, str):
-               try:
+            if isinstance(house_detail, str):
+                try:
                    # Attempt to convert the string to a dictionary
-                   house_detail = json.loads(house_detail)
-               except json.JSONDecodeError:
-                   print(f"Error: Failed to decode full house details JSON string for house ID {id}. Skipping house.")
-                   continue # Skip this house if decoding fails
+                    house_detail = json.loads(house_detail)
+                except json.JSONDecodeError:
+                    print(f"Error: Failed to decode full house details JSON string for house ID {id}. Skipping house.")
+                    continue # Skip this house if decoding fails
             
             publish_data_raw = house_detail.get('publish')
             # Check if the retrieved data is a string (a JSON string)
