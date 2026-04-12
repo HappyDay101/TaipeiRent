@@ -30,6 +30,7 @@ jobs:
           MAX_PRICE: "35000"
           KEYWORDS: "大安,東門,大安森林公園,中山,中正,大同"
           WANTED_PAGES: "2"
+          SEND_EMPTY_STATUS: "true"
         run: python main.py
 
       - name: Commit seen listing ids

@@ -45,6 +45,7 @@ class Rent591Watcher:
         discord_webhook_url: str | None = None,
         dry_run: bool = False,
         mark_seen_only: bool = False,
+        send_empty_status: bool = False,
     ) -> None:
         self.search_url = self._normalize_search_url(url)
         self.wanted_pages = wanted_pages
@@ -54,6 +55,7 @@ class Rent591Watcher:
         self.discord_webhook_url = discord_webhook_url
         self.dry_run = dry_run
         self.mark_seen_only = mark_seen_only
+        self.send_empty_status = send_empty_status
         self.session = requests.Session()
         self.session.headers.update(DEFAULT_HEADERS)
 
@@ -281,6 +283,13 @@ class Rent591Watcher:
             return
         self.send_discord_message(message)
 
+    def notify_no_new_listing(self) -> None:
+        message = "No new listing found / 未找到新房源"
+        if self.dry_run:
+            print(f"\n--- STATUS ---\n{message}")
+            return
+        self.send_discord_message(message)
+
     def run(self) -> None:
         seen_ids = self.load_seen_ids()
         house_ids = self.get_house_ids()
@@ -318,6 +327,8 @@ class Rent591Watcher:
         if self.mark_seen_only:
             print(f"Matched {matched_count} listings, marked {marked_count} as seen, sent 0 notifications.")
             return
+        if new_count == 0 and self.send_empty_status:
+            self.notify_no_new_listing()
         print(f"Matched {matched_count} listings, sent {new_count} new notifications.")
 
 
@@ -331,6 +342,7 @@ def main() -> None:
     keywords = [item.strip() for item in keywords_raw.split(",") if item.strip()]
     dry_run = env_flag("DRY_RUN", default=False)
     mark_seen_only = env_flag("MARK_SEEN_ONLY", default=False)
+    send_empty_status = env_flag("SEND_EMPTY_STATUS", default=False)
 
     discord_webhook_url = os.getenv("DISCORD_WEBHOOK_URL")
 
@@ -342,6 +354,7 @@ def main() -> None:
         discord_webhook_url=discord_webhook_url,
         dry_run=dry_run,
         mark_seen_only=mark_seen_only,
+        send_empty_status=send_empty_status,
     )
     watcher.run()
 

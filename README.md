@@ -55,6 +55,7 @@ export DISCORD_WEBHOOK_URL='paste_your_discord_webhook_url_here'
 export MAX_PRICE='35000'
 export KEYWORDS='大安,東門,大安森林公園,中山,中正,大同'
 export WANTED_PAGES='2'
+export SEND_EMPTY_STATUS='true'
 ```
 
 ## Step 4: Test locally first
@@ -96,6 +97,7 @@ Then:
 
 The workflow commits `seen_ids.json` back to the repo, so duplicate notifications are avoided across scheduled runs too.
 The default workflow schedule is hourly from `09:00` to `04:00` Taipei time.
+The default workflow also sends `No new listing found / 未找到新房源` when a run finishes without any new matches.
 
 ## Local development notes
 
@@ -103,6 +105,7 @@ The default workflow schedule is hourly from `09:00` to `04:00` Taipei time.
 - `KEYWORDS` can also be changed without code edits by setting the environment variable.
 - If you want to trust the 591 URL only, set `KEYWORDS` to an empty string locally and remove the workflow `KEYWORDS` value.
 - `WANTED_PAGES=2` means the script checks the first 2 result pages.
+- `SEND_EMPTY_STATUS=true` posts a heartbeat message when no new listings are found.
 
 ## Quick troubleshooting
 
