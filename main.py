@@ -27,6 +27,13 @@ def env_flag(name: str, default: bool = False) -> bool:
     return value.strip().lower() in {"1", "true", "yes", "on"}
 
 
+def require_env(name: str) -> str:
+    value = os.getenv(name, "").strip()
+    if not value:
+        raise RuntimeError(f"Missing required environment variable: {name}")
+    return value
+
+
 class Rent591Watcher:
     def __init__(
         self,
@@ -315,7 +322,9 @@ class Rent591Watcher:
 
 
 def main() -> None:
-    url = os.environ["URL"]
+    url = require_env("URL")
+    if not url.startswith(("http://", "https://")):
+        raise RuntimeError("URL must start with http:// or https://")
     wanted_pages = int(os.getenv("WANTED_PAGES", "2"))
     max_price = int(os.getenv("MAX_PRICE", "35000"))
     keywords_raw = os.getenv("KEYWORDS", ",".join(DEFAULT_KEYWORDS))
