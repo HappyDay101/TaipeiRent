@@ -2,8 +2,8 @@ name: Rent591Watcher
 
 on:
   schedule:
-  # scheduled at 8, 16, 0am (UTC+8)
-    - cron: "0 0,8,16 * * *"
+  # scheduled hourly from 09:00 to 04:00 Taipei time (UTC+8)
+    - cron: "0 1-20 * * *"
   workflow_dispatch:
 
 jobs:
@@ -28,7 +28,7 @@ jobs:
           URL: ${{ secrets.URL }}
           DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
           MAX_PRICE: "35000"
-          KEYWORDS: "大安,東門,大安森林公園"
+          KEYWORDS: "大安,東門,大安森林公園,中山,中正,大同"
           WANTED_PAGES: "2"
         run: python main.py
 

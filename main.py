@@ -16,7 +16,7 @@ DEFAULT_HEADERS = {
         "Chrome/124.0.0.0 Safari/537.36"
     )
 }
-DEFAULT_KEYWORDS = ["大安", "東門", "大安森林公園"]
+DEFAULT_KEYWORDS = ["大安", "東門", "大安森林公園", "中山", "中正", "大同"]
 SEEN_IDS_FILE = Path("seen_ids.json")
 
 
@@ -224,7 +224,7 @@ class Rent591Watcher:
 
         text = listing["combined_text"]
 
-        if not any(keyword in text for keyword in self.keywords):
+        if self.keywords and not any(keyword in text for keyword in self.keywords):
             return False
 
         if "電梯" not in text:

@@ -4,9 +4,10 @@ This project scrapes 591 rental listings, filters for a Taipei personal search, 
 
 Current default filters:
 - Price `<= 35000`
-- Keywords: `大安`, `東門`, `大安森林公園`
+- Keywords: `大安`, `東門`, `大安森林公園`, `中山`, `中正`, `大同`
 - Must include `電梯`
 - Must be `整層住家`
+- 591 URL can additionally restrict districts, cooking, floor range, and rooftop exclusion
 
 The script stores notified listing IDs in `seen_ids.json` so it does not send the same house twice.
 
@@ -49,10 +50,10 @@ pip install -r requirements.txt
 Use your own 591 URL or the one you already shared.
 
 ```bash
-export URL='https://rent.591.com.tw/list?region=1&section=5&price=25000$_35000$&other=lift'
+export URL='https://rent.591.com.tw/list?region=1&section=5,1,2,3&price=25000$_35000$&other=lift,cook&floor=2_6,6_12,13_&notice=not_cover'
 export DISCORD_WEBHOOK_URL='paste_your_discord_webhook_url_here'
 export MAX_PRICE='35000'
-export KEYWORDS='大安,東門,大安森林公園'
+export KEYWORDS='大安,東門,大安森林公園,中山,中正,大同'
 export WANTED_PAGES='2'
 ```
 
@@ -94,11 +95,13 @@ Then:
 3. Run it once manually.
 
 The workflow commits `seen_ids.json` back to the repo, so duplicate notifications are avoided across scheduled runs too.
+The default workflow schedule is hourly from `09:00` to `04:00` Taipei time.
 
 ## Local development notes
 
 - Change filters in `main.py` if your search changes later.
 - `KEYWORDS` can also be changed without code edits by setting the environment variable.
+- If you want to trust the 591 URL only, set `KEYWORDS` to an empty string locally and remove the workflow `KEYWORDS` value.
 - `WANTED_PAGES=2` means the script checks the first 2 result pages.
 
 ## Quick troubleshooting
