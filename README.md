@@ -1,34 +1,118 @@
-# 591 租屋網 新屋通知機器人 2024版
-<a href="url"><img src="https://s2.loli.net/2024/09/29/18PBSlfcI6MhbtE.jpg" width="400" ></a>
+# Taipei 591 Rent Watcher
 
+This project scrapes 591 rental listings, filters for a Taipei personal search, and sends only new matches to a Discord channel through a webhook.
 
-- 從網路上歷年來不斷更迭的爬蟲程式碼可以知道 591 從沒放棄防範爬蟲，相信過不久程式又要修改。
-- 首先想謝謝網路上各位前輩的努力，尤其是 IT空間-Jia 大大，我從中借鑒了許多程式碼，謝謝 ><
-- 總而言之，如果想要在每天 8/16/24 點收到最新的租屋資訊，請跟著這個步驟做下去^^
+Current default filters:
+- Price `<= 35000`
+- Keywords: `大安`, `東門`, `大安森林公園`
+- Must include `電梯`
+- Must be `整層住家`
 
-## 1. 確認 591 租屋網的網址
-如下圖所示，可以根據偏好設定 591 租屋網的的條件，並且記住設定後的 591 網址
-<a href="url"><img src="https://s2.loli.net/2024/09/29/v78P2YcDpoL5mkE.png" width="600" ></a>
+The script stores notified listing IDs in `seen_ids.json` so it does not send the same house twice.
 
+## Repo structure
 
-## 2. 申請 LINE 金鑰
-這樣才可以傳訊息給自己，申請方式請參考: https://notify-bot.line.me/zh_TW
+- [main.py](./main.py): scraping, filtering, dedupe, formatting, Discord notification
+- [.github/workflows/python-package.yml](./.github/workflows/python-package.yml): scheduled GitHub Actions run
+- [requirements.txt](./requirements.txt): Python dependencies
 
+## How it works
 
-## 3. 複製這個專案到自己的帳號
-- 專案地址：[github/Rent591Watcher](https://github.com/ryk001/Rent591Watcher/tree/main)
-- 點擊右上角 Fork 專案至自己的帳號底下
+1. Open the 591 search page and collect listing IDs.
+2. Fetch each listing detail from the 591 detail API.
+3. Normalize each listing into a simple structure.
+4. Filter by price, keywords, elevator, and whole-unit requirement.
+5. Skip already-seen listing IDs from `seen_ids.json`.
+6. Send clean Discord messages for brand new matches.
 
-## 4. 設定 Secret
-- 建立一個名為`URL`的 secret，裡面填上設定條件後的 591 網址
-- 再建立一個名為`LINE_NOTIFY_TOKEN`的 secret，裡面填上 LINE Notify 的金鑰
-<a href="url"><img src="https://s2.loli.net/2024/09/29/vILHKqVw91JuxR3.png" width="600" ></a>
+## Step 1: Create a Discord webhook
 
-## 5. 啟用 Actions
+1. Open Discord.
+2. Create a server or use an existing one.
+3. Create a channel like `rent-alerts`.
+4. Open the channel settings.
+5. Go to `Integrations`.
+6. Click `Webhooks`.
+7. Create a new webhook.
+8. Copy the webhook URL.
 
-Actions 默認是關閉狀態，在 Fork 之後需要先手動執行一次，成功運行才會被激活。
+This webhook URL is the only thing you need for notifications.
 
-返回項目主頁面，點擊上方的`Actions`，再點擊右側的`Rent591Watcher`，再點擊`Run workflow`
-<a href="url"><img src="https://s2.loli.net/2024/09/29/Chqx6IiofseBQ4F.png" width="600" ></a>
+## Step 2: Install Python dependencies
 
-運行成功後，就大功告成啦! 有任何疑問與建議歡迎交流，我們下次見!!!
+```bash
+pip install -r requirements.txt
+```
+
+## Step 3: Set environment variables
+
+Use your own 591 URL or the one you already shared.
+
+```bash
+export URL='https://rent.591.com.tw/list?region=1&section=5&price=25000$_35000$&other=lift'
+export DISCORD_WEBHOOK_URL='paste_your_discord_webhook_url_here'
+export MAX_PRICE='35000'
+export KEYWORDS='大安,東門,大安森林公園'
+export WANTED_PAGES='2'
+```
+
+## Step 4: Test locally first
+
+Run in dry mode first so nothing gets posted while you verify matches.
+
+```bash
+export DRY_RUN='true'
+python main.py
+```
+
+Expected result:
+- matching listings print to the terminal
+- no Discord messages are sent
+- `seen_ids.json` is not updated during dry run
+- each printed result shows title, price, location, and link
+
+If the printed matches look correct, turn off dry run:
+
+```bash
+unset DRY_RUN
+python main.py
+```
+
+That run will post new matches to your Discord channel and save their IDs in `seen_ids.json`.
+
+## Step 5: Use GitHub Actions for automatic checks
+
+Add these GitHub repository secrets:
+
+- `URL`
+- `DISCORD_WEBHOOK_URL`
+
+Then:
+
+1. Go to the `Actions` tab.
+2. Open the `Rent591Watcher` workflow.
+3. Run it once manually.
+
+The workflow commits `seen_ids.json` back to the repo, so duplicate notifications are avoided across scheduled runs too.
+
+## Local development notes
+
+- Change filters in `main.py` if your search changes later.
+- `KEYWORDS` can also be changed without code edits by setting the environment variable.
+- `WANTED_PAGES=2` means the script checks the first 2 result pages.
+
+## Quick troubleshooting
+
+If Discord does not receive messages:
+- make sure the webhook URL is correct
+- make sure the channel still has that webhook enabled
+- make sure `DRY_RUN` is turned off
+
+If nothing matches:
+- run with `DRY_RUN=true`
+- widen the 591 URL filters
+- check whether the listings actually contain `大安`, `東門`, `大安森林公園`, `電梯`, and `整層住家`
+
+If 591 changes their site:
+- the scraper may need small adjustments
+- the most likely places to update are listing extraction in `get_house_ids()` and field parsing in `normalize_listing()`

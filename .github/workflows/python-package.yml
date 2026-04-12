@@ -2,31 +2,44 @@ name: Rent591Watcher
 
 on:
   schedule:
-  # scheduled at 8, 16, 0am (UTC+8), weekdays
+  # scheduled at 8, 16, 0am (UTC+8)
     - cron: "0 0,8,16 * * *"
   workflow_dispatch:
-
-env:
-  ACTIONS_ALLOW_UNSECURE_COMMANDS: true
 
 jobs:
   scrape-latest:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     steps:
       - name: Checkout repo
-        uses: actions/checkout@v2
-      
+        uses: actions/checkout@v4
+
       - name: Set up Python
-        uses: actions/setup-python@v2.0.0
+        uses: actions/setup-python@v5
         with:
-          python-version: '3.10'
-      
+          python-version: "3.10"
+
       - name: Install requirements
         run: pip install -r requirements.txt
-      
-      - name: Run Python Code
+
+      - name: Run scraper
         env:
           URL: ${{ secrets.URL }}
-          TG_CHANNEL: ${{ secrets.TG_CHANNEL }}
-          TG_TOKEN: ${{ secrets.TG_TOKEN }}
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+          MAX_PRICE: "35000"
+          KEYWORDS: "大安,東門,大安森林公園"
+          WANTED_PAGES: "2"
         run: python main.py
+
+      - name: Commit seen listing ids
+        run: |
+          if [ -z "$(git status --porcelain -- seen_ids.json)" ]; then
+            echo "No seen_ids.json changes to commit."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add seen_ids.json
+          git commit -m "Update seen listing ids"
+          git push
