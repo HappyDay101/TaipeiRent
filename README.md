@@ -47,9 +47,10 @@ pip install -r requirements.txt
 
 ## Step 3: Set environment variables
 
-Use your own 591 URL or the one you already shared.
+Use your own 591 URL or use the existing one.
 
 ```bash
+# Add your URL after selecting the filters below
 export URL='https://rent.591.com.tw/list?region=1&section=5,1,2,3&price=25000$_35000$&other=lift,cook&floor=2_6,6_12,13_&notice=not_cover'
 export DISCORD_WEBHOOK_URL='paste_your_discord_webhook_url_here'
 export MAX_PRICE='35000'
