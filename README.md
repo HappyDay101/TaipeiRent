@@ -5,9 +5,24 @@ This project scrapes 591 rental listings, filters for a Taipei personal search, 
 Current default filters:
 - Price `<= 35000`
 - Keywords: `大安`, `東門`, `大安森林公園`, `中山`, `中正`, `大同`
-- Must include `電梯`
-- Must be `整層住家`
-- 591 URL can additionally restrict districts, cooking, floor range, and rooftop exclusion
+- Must include `電梯` (can be disabled with `REQUIRE_ELEVATOR=false`)
+- Allowed property types: `整層住家` (configurable with `ALLOWED_KINDS`)
+- 591 URL can additionally restrict districts, MRT stations, cooking, floor range, and rooftop exclusion
+
+### Searching more than one property type (e.g. 整層住家 + 獨立套房)
+
+591 only lets a single 類型 (property type) be selected per search — both in the
+website UI and in the URL (`kind=1,2` is silently treated as `kind=1`). To watch two
+types at once, give the `URL` variable **two URLs** separated by a space or newline —
+one per type — and the watcher fetches both, merges, and de-duplicates them. Set
+`ALLOWED_KINDS` so the code-side filter keeps both types:
+
+```bash
+export URL='https://rent.591.com.tw/list?...&kind=1&... https://rent.591.com.tw/list?...&kind=2&...'
+export ALLOWED_KINDS='整層住家,獨立套房'
+```
+
+591 `kind` values: `1`=整層住家, `2`=獨立套房, `3`=分租套房, `4`=雅房.
 
 The script stores notified listing IDs in `seen_ids.json` so it does not send the same house twice.
 
@@ -47,17 +62,30 @@ pip install -r requirements.txt
 
 ## Step 3: Set environment variables
 
-Use your own 591 URL or use the existing one.
+Use your own 591 URL(s). The example below watches the 板南線 MRT search for both
+整層住家 and 獨立套房 within 1000m of 國父紀念館 / 忠孝敦化 / 忠孝復興 / 忠孝新生 / 善導寺,
+`20000-30000` 元, 電梯大樓, excluding rooftop additions:
 
 ```bash
-# Add your URL after selecting the filters below
-export URL='https://rent.591.com.tw/list?region=1&section=5,1,2,3&price=25000$_35000$&other=lift,cook&floor=2_6,6_12,13_&notice=not_cover'
+export URL='https://rent.591.com.tw/list?region=1&metro=168&mrt_distance=1000&station=4267,4221,4187,4264,4263&kind=1&price=20000_30000&shape=2&notice=not_cover https://rent.591.com.tw/list?region=1&metro=168&mrt_distance=1000&station=4267,4221,4187,4264,4263&kind=2&price=20000_30000&shape=2&notice=not_cover'
 export DISCORD_WEBHOOK_URL='paste_your_discord_webhook_url_here'
-export MAX_PRICE='35000'
-export KEYWORDS='大安,東門,大安森林公園,中山,中正,大同'
+export MAX_PRICE='30000'
+export ALLOWED_KINDS='整層住家,獨立套房'
+export KEYWORDS=''          # empty = trust the URL (MRT-based search, no district keywords)
+export REQUIRE_ELEVATOR='false'   # shape=2 already restricts to 電梯大樓
 export WANTED_PAGES='2'
 export SEND_EMPTY_STATUS='true'
 ```
+
+Environment variables:
+- `URL` — one or more 591 search URLs (space/newline separated). Each extra URL is
+  merged and de-duplicated, which is how you combine property types.
+- `MAX_PRICE` — hard upper bound applied in code on top of the URL filter.
+- `ALLOWED_KINDS` — comma-separated property types to keep (default `整層住家`). Empty = keep all.
+- `KEYWORDS` — comma-separated text that must appear in a listing. Empty = no keyword filter.
+- `REQUIRE_ELEVATOR` — require `電梯` in the listing (default `true`).
+- `WANTED_PAGES` — how many result pages to scan per URL.
+- `SEND_EMPTY_STATUS` — post a heartbeat when a run finds nothing new.
 
 ## Step 4: Test locally first
 
@@ -87,14 +115,21 @@ That run will post new matches to your Discord channel and save their IDs in `se
 
 Add these GitHub repository secrets:
 
-- `URL`
+- `URL` — the first 591 search URL (e.g. the `kind=1` / 整層住家 search)
+- `URL2` — the second 591 search URL (e.g. the `kind=2` / 獨立套房 search); optional
 - `DISCORD_WEBHOOK_URL`
+
+The workflow combines `URL` and `URL2` into one multi-URL search, so each secret holds
+a single URL. If you only want one property type, leave `URL2` unset.
 
 Then:
 
-1. Go to the `Actions` tab.
-2. Open the `Rent591Watcher` workflow.
-3. Run it once manually.
+1. Go to the `Actions` tab (if you see a banner, click **"I understand my workflows, go ahead and enable them"**).
+2. Open the `Rent591Watcher` workflow (if it shows **"Enable workflow"**, click it).
+3. Click **Run workflow** to run it once manually and confirm it works.
+
+Once the workflow file is on the `main` branch and Actions are enabled, the hourly
+schedule runs automatically — no further action needed.
 
 The workflow commits `seen_ids.json` back to the repo, so duplicate notifications are avoided across scheduled runs too.
 The default workflow schedule is hourly from `09:00` to `04:00` Taipei time.

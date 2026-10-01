@@ -37,20 +37,26 @@ def require_env(name: str) -> str:
 class Rent591Watcher:
     def __init__(
         self,
-        url: str,
+        urls: list[str] | str,
         wanted_pages: int = 2,
         max_price: int = 35000,
         keywords: list[str] | None = None,
+        allowed_kinds: set[str] | None = None,
+        require_elevator: bool = True,
         seen_ids_file: Path = SEEN_IDS_FILE,
         discord_webhook_url: str | None = None,
         dry_run: bool = False,
         mark_seen_only: bool = False,
         send_empty_status: bool = False,
     ) -> None:
-        self.search_url = self._normalize_search_url(url)
+        if isinstance(urls, str):
+            urls = [urls]
+        self.search_urls = [self._normalize_search_url(u) for u in urls]
         self.wanted_pages = wanted_pages
         self.max_price = max_price
-        self.keywords = keywords or DEFAULT_KEYWORDS
+        self.keywords = keywords if keywords is not None else DEFAULT_KEYWORDS
+        self.allowed_kinds = allowed_kinds if allowed_kinds is not None else {"整層住家"}
+        self.require_elevator = require_elevator
         self.seen_ids_file = seen_ids_file
         self.discord_webhook_url = discord_webhook_url
         self.dry_run = dry_run
@@ -70,21 +76,20 @@ class Rent591Watcher:
     def get_house_ids(self) -> list[str]:
         house_ids: list[str] = []
 
-        for page in range(1, self.wanted_pages + 1):
-            page_url = self.search_url if page == 1 else f"{self.search_url}&page={page}"
-            response = self.session.get(page_url, headers=DEFAULT_HEADERS)
-            response.raise_for_status()
-            soup = BeautifulSoup(response.text, "html.parser")
-            page_ids: list[str] = []
-            for link in soup.find_all("a", href=True):
-                house_id = self._extract_house_id_from_href(link["href"])
-                if house_id:
-                    page_ids.append(house_id)
-            house_ids.extend(page_ids)
-            self._sleep()
+        for search_url in self.search_urls:
+            for page in range(1, self.wanted_pages + 1):
+                page_url = search_url if page == 1 else f"{search_url}&page={page}"
+                response = self.session.get(page_url, headers=DEFAULT_HEADERS)
+                response.raise_for_status()
+                soup = BeautifulSoup(response.text, "html.parser")
+                for link in soup.find_all("a", href=True):
+                    house_id = self._extract_house_id_from_href(link["href"])
+                    if house_id:
+                        house_ids.append(house_id)
+                self._sleep()
 
         unique_ids = list(dict.fromkeys(house_ids))
-        print(f"Fetched {len(unique_ids)} listing ids")
+        print(f"Fetched {len(unique_ids)} listing ids from {len(self.search_urls)} search url(s)")
         return unique_ids
 
     def _extract_house_id_from_href(self, href: str) -> str | None:
@@ -110,7 +115,6 @@ class Rent591Watcher:
     def normalize_listing(self, house_id: str, house_html: str) -> dict:
         soup = BeautifulSoup(house_html, "html.parser")
         page_text = soup.get_text("\n", strip=True)
-        summary_text = self._extract_summary_text(page_text)
 
         title = (
             self._extract_meta_content(soup, "property", "og:title")
@@ -122,12 +126,12 @@ class Rent591Watcher:
         address = self._extract_address(page_text)
         location = address.replace("台北市", "", 1) if address else ""
         description = self._extract_description(page_text)
-        kind = self._extract_kind(summary_text)
-        shape = self._extract_shape(summary_text)
-        floor = self._extract_floor(summary_text)
-        room = self._extract_room_text(summary_text)
+        kind = self._extract_kind(page_text, house_id)
+        shape = self._extract_shape(page_text)
+        floor = self._extract_floor(page_text)
+        room = self._extract_room_text(page_text)
         tags = [value for value in [kind, shape, floor, room] if value]
-        combined_text = " ".join([title, location, description, summary_text, " ".join(tags)])
+        combined_text = " ".join([title, location, description, " ".join(tags)])
 
         return {
             "id": house_id,
@@ -155,15 +159,6 @@ class Rent591Watcher:
         heading = soup.find(["h1", "h2"])
         return heading.get_text(" ", strip=True) if heading else ""
 
-    def _extract_summary_text(self, text: str) -> str:
-        lines = [line.strip() for line in text.splitlines() if line.strip()]
-        for index, line in enumerate(lines):
-            if line in {"整層住家", "獨立套房", "分租套房", "雅房"}:
-                return " ".join(lines[index:index + 6])
-            if any(kind in line for kind in ["整層住家", "獨立套房", "分租套房", "雅房"]):
-                return " ".join(lines[index:index + 4])
-        return text
-
     def _extract_price(self, text: str) -> int:
         match = re.search(r"([\d,]+)\s*元/月", text)
         if not match:
@@ -188,13 +183,31 @@ class Rent591Watcher:
             return " ".join(line.strip() for line in match.group(1).splitlines() if line.strip())
         return ""
 
-    def _extract_kind(self, text: str) -> str:
+    def _extract_kind(self, text: str, house_id: str = "") -> str:
+        # Prefer the breadcrumb (台北市 / 大安區 / 整層住家 / R12345678) so we read
+        # the listing's real type instead of the site navigation menu at the top.
+        if house_id:
+            match = re.search(
+                r"(整層住家|獨立套房|分租套房|雅房)\s*\n\s*R?" + re.escape(str(house_id)),
+                text,
+            )
+            if match:
+                return match.group(1)
+        # Fallback: the spec row (獨立套房 / 8坪 / ...) where a kind precedes the area.
+        match = re.search(r"(整層住家|獨立套房|分租套房|雅房)\s*\n\s*[\d.]+坪", text)
+        if match:
+            return match.group(1)
         for candidate in ["整層住家", "獨立套房", "分租套房", "雅房"]:
             if candidate in text:
                 return candidate
         return ""
 
     def _extract_shape(self, text: str) -> str:
+        # Anchor on the spec row (... / 電梯大樓 / 22,000 / 元/月) to avoid stray
+        # mentions elsewhere on the page.
+        match = re.search(r"(電梯大樓|公寓|透天厝|別墅|華廈)\s*\n\s*[\d,]+\s*\n\s*元/月", text)
+        if match:
+            return match.group(1)
         for candidate in ["電梯大樓", "公寓", "透天厝", "別墅", "華廈"]:
             if candidate in text:
                 return candidate
@@ -205,7 +218,9 @@ class Rent591Watcher:
         return match.group(1) if match else ""
 
     def _extract_room_text(self, text: str) -> str:
-        match = re.search(r"(\d+房(?:\d+廳)?(?:\d+衛)?)", text)
+        # The layout (e.g. 1房1廳) sits on the spec row right before the area (坪).
+        # Anchoring on 坪 avoids catching the "591房屋" site branding.
+        match = re.search(r"(\d+房(?:\d+廳)?(?:\d+衛)?)\s*\n\s*[\d.]+坪", text)
         return match.group(1) if match else ""
 
     def _extract_post_time(self, text: str) -> str:
@@ -229,10 +244,10 @@ class Rent591Watcher:
         if self.keywords and not any(keyword in text for keyword in self.keywords):
             return False
 
-        if "電梯" not in text:
+        if self.require_elevator and "電梯" not in text:
             return False
 
-        if listing.get("kind") != "整層住家":
+        if self.allowed_kinds and listing.get("kind") not in self.allowed_kinds:
             return False
 
         return True
@@ -333,13 +348,24 @@ class Rent591Watcher:
 
 
 def main() -> None:
-    url = require_env("URL")
-    if not url.startswith(("http://", "https://")):
-        raise RuntimeError("URL must start with http:// or https://")
+    url_raw = require_env("URL")
+    urls = [item.strip() for item in re.split(r"[\s|]+", url_raw) if item.strip()]
+    for url in urls:
+        if not url.startswith(("http://", "https://")):
+            raise RuntimeError("Every URL must start with http:// or https://")
     wanted_pages = int(os.getenv("WANTED_PAGES", "2"))
     max_price = int(os.getenv("MAX_PRICE", "35000"))
-    keywords_raw = os.getenv("KEYWORDS", ",".join(DEFAULT_KEYWORDS))
-    keywords = [item.strip() for item in keywords_raw.split(",") if item.strip()]
+
+    keywords_raw = os.getenv("KEYWORDS")
+    if keywords_raw is None:
+        keywords = DEFAULT_KEYWORDS
+    else:
+        keywords = [item.strip() for item in keywords_raw.split(",") if item.strip()]
+
+    kinds_raw = os.getenv("ALLOWED_KINDS", "整層住家")
+    allowed_kinds = {item.strip() for item in kinds_raw.split(",") if item.strip()}
+
+    require_elevator = env_flag("REQUIRE_ELEVATOR", default=True)
     dry_run = env_flag("DRY_RUN", default=False)
     mark_seen_only = env_flag("MARK_SEEN_ONLY", default=False)
     send_empty_status = env_flag("SEND_EMPTY_STATUS", default=False)
@@ -347,10 +373,12 @@ def main() -> None:
     discord_webhook_url = os.getenv("DISCORD_WEBHOOK_URL")
 
     watcher = Rent591Watcher(
-        url=url,
+        urls=urls,
         wanted_pages=wanted_pages,
         max_price=max_price,
         keywords=keywords,
+        allowed_kinds=allowed_kinds,
+        require_elevator=require_elevator,
         discord_webhook_url=discord_webhook_url,
         dry_run=dry_run,
         mark_seen_only=mark_seen_only,

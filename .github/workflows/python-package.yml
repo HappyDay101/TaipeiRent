@@ -25,10 +25,14 @@ jobs:
 
       - name: Run scraper
         env:
-          URL: ${{ secrets.URL }}
+          # URL holds one or more 591 searches (space/newline separated). We combine
+          # the URL and URL2 repository secrets so both property-type searches run.
+          URL: "${{ secrets.URL }} ${{ secrets.URL2 }}"
           DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
-          MAX_PRICE: "35000"
-          KEYWORDS: "大安,東門,大安森林公園,中山,中正,大同"
+          MAX_PRICE: "30000"
+          ALLOWED_KINDS: "整層住家,獨立套房"
+          KEYWORDS: ""
+          REQUIRE_ELEVATOR: "false"
           WANTED_PAGES: "2"
           SEND_EMPTY_STATUS: "true"
         run: python main.py
