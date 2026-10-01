@@ -5,6 +5,11 @@ on:
   # scheduled hourly from 09:00 to 04:00 Taipei time (UTC+8)
     - cron: "0 1-20 * * *"
   workflow_dispatch:
+    inputs:
+      mark_seen_only:
+        description: "Silent catch-up: record current listings as seen without sending Discord alerts"
+        type: boolean
+        default: false
 
 jobs:
   scrape-latest:
@@ -35,6 +40,8 @@ jobs:
           REQUIRE_ELEVATOR: "false"
           WANTED_PAGES: "2"
           SEND_EMPTY_STATUS: "true"
+          # true only for a manual "silent catch-up" dispatch; empty on scheduled runs
+          MARK_SEEN_ONLY: ${{ inputs.mark_seen_only }}
         run: python main.py
 
       - name: Commit seen listing ids
