@@ -44,7 +44,7 @@ jobs:
           KEYWORDS: ""
           REQUIRE_ELEVATOR: "false"
           WANTED_PAGES: "2"
-          SEND_EMPTY_STATUS: "true"
+          SEND_EMPTY_STATUS: "false"
           # true only for a manual "silent catch-up" dispatch; empty on scheduled runs
           MARK_SEEN_ONLY: ${{ inputs.mark_seen_only }}
         run: python main.py
